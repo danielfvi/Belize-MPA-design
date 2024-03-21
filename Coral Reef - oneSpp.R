@@ -7,116 +7,82 @@ set.seed(42)
 
 resolution <- 12
 
-patches <- resolution ^ 2
+patches <- 4386
 
-patch_area <- 5 # km2
+patch_area <- 10 # km2
 
 patch_side <- sqrt(patch_area) # km
 
 simulation_area <- patch_area * patches #km2
 
-seasons <- 4
+seasons <- 1
 
 tune_type <- "depletion"
 
 experiment_workers <- parallel::detectCores() - 2
 
-years <- 100
+years <- 50
 
 # set diffusion rates -----------------------------------------------------
 
 snapper_diffusion <- 4 # km^2/year
 
-deep_snapper_diffusion <- 2 # km^2/year
+lobster_diffusion <-  2 # km^2/year
 
-grouper_diffusion <-  50 * patch_area # km^2/year
-
-shark_diffusion <-  50 * patch_area # km^2/year
+conch_diffusion <-  0.5 # km^2/year
 
 max_hab_mult = 20
 
 # setup spatial things ----------------------------------------------------
+reef_ras <- read_csv("data/reef_ras.csv") %>% 
+  rename(layer = ...3)
+seagrass_mangrove_ras <- read_csv("data/seagrass_mangrove_ras.csv") %>% 
+  rename(layer = ...3)
 
-reef_width <- 2.5
-
-reefs <-
-  data.frame(
-    x = c(2, 2, 2, 10, 10, 10, 10, 10, 19, 19, 19),
-    y = c(4, 8, 19, 14, 14, 15, 2, 7, 9, 2, 19)
-  )
-
-
-long_reef_habitat <-
-  expand_grid(x = 1:resolution, y = 1:resolution) %>%
-  mutate(habitat = 0)
-
-long_spawning_ground <-
-  expand_grid(x = 1:resolution, y = 1:resolution) %>%
-  mutate(habitat = dnorm(x, reefs$x[1], reef_width) * dnorm(y, reefs$y[1], 1))
-
-
-long_spawning_ground$habitat <-
-  scales::rescale(long_spawning_ground$habitat, c(0, log(100)))
-
-for (i in 1:nrow(reefs)) {
-  long_reef_habitat$habitat <-
-    long_reef_habitat$habitat + dnorm(long_reef_habitat$x, reefs$x[i], reef_width) * dnorm(long_reef_habitat$y, reefs$y[i], reef_width)
-  
-}
-
-long_reef_habitat$habitat <-
-  scales::rescale(long_reef_habitat$habitat, c(0, log(20)))
-
-
-reef_habitat <- long_reef_habitat %>%
-  pivot_wider(names_from = y, values_from = habitat) %>%
+reef_habitat <- reef_ras %>%
+  pivot_wider(names_from = y, values_from = layer) %>%
   select(-x) %>%
   as.matrix()
 
+reef_habitat[is.na(reef_habitat)] <- 0
 
-deep_reef_habitat <- long_reef_habitat %>%
-  mutate(habitat = habitat * 1 / (1 + exp(-(x - resolution / 1.25))),
-         habitat = scales::rescale(habitat, c(0, log(3)))) %>%
-  pivot_wider(names_from = y, values_from = habitat) %>%
+juvenile_habitat <- seagrass_mangrove_ras %>%
+  pivot_wider(names_from = y, values_from = layer) %>%
   select(-x) %>%
   as.matrix()
 
+juvenile_habitat[is.na(juvenile_habitat)] <- 0
 
-
-shallow_reef_habitat <- long_reef_habitat %>%
-  mutate(habitat = habitat * (1 - 1 / (1 + exp(
-    -(x - resolution / 1.25)
-  ))) * (x < (0.5 * resolution)),
-  habitat = scales::rescale(habitat, c(0, log(3)))) %>%
-  pivot_wider(names_from = y, values_from = habitat) %>%
-  select(-x) %>%
-  as.matrix()
-
-spawning_ground <- long_spawning_ground %>%
-  pivot_wider(names_from = y, values_from = habitat) %>%
-  select(-x) %>%
-  as.matrix()
-
-
-ports <-  data.frame(x =  c(1, 1),
-                     y = c(2, resolution),
-                     fleet = c(1, 2))
+ports <-  data.frame(x =  c(24),
+                     y = c(17.41),
+                     fleet = c(1))
 write_rds(ports, file.path(results_path, "coral_ports.rds"))
 
-# setup basline fauna -----------------------------------------------------
-
-
+# setup baseline fauna -----------------------------------------------------
 write_rds(
   list(
-    shallow_reef_habitat = shallow_reef_habitat,
-    deep_reef_habitat = deep_reef_habitat,
-    spawning_ground = spawning_ground
+    reef_habitat = reef_habitat,
+    juvenile_habitat = juvenile_habitat
   ),
   file.path(results_path, "coral_habitat.rds")
 )
 
-
-
+# snapper <- create_critter(
+#   scientific_name = "lutjanus analis",
+#   habitat = reef_habitat,
+#   recruit_habitat = juvenile_habitat,
+#   adult_diffusion = snapper_diffusion,
+#   recruit_diffusion = simulation_area ,
+#   density_dependence = "pre_dispersal",
+#   # recruitment form, where 1 implies local recruitment
+#   seasons = seasons,
+#   resolution = resolution,
+#   init_explt = 0.125,
+#   fished_depletion = 0.3,
+#   ssb0 = 4000,
+#   max_hab_mult = max_hab_mult,
+#   patch_area = patch_area
+# )
 snapper <- create_critter(
   scientific_name = "lutjanus malabaricus",
   habitat = lapply(1:seasons, function(x)
@@ -134,88 +100,50 @@ snapper <- create_critter(
   max_hab_mult = max_hab_mult,
   patch_area = patch_area
 )
+# lobster
 
-# deep water snapper
+# lobster <- create_critter(
+#   scientific_name = "panulirus argus",
+#   habitat = reef_habitat,
+#   recruit_habitat = juvenile_habitat,
+#   adult_diffusion = lobster_diffusion,
+#   recruit_diffusion = simulation_area ,
+#   density_dependence = "pre_dispersal",
+#   # recruitment form, where 1 implies local recruitment
+#   seasons = seasons,
+#   resolution = resolution,
+#   init_explt = 0.125,
+#   fished_depletion = 0.3,
+#   ssb0 = 4000,
+#   max_hab_mult = max_hab_mult,
+#   patch_area = patch_area
+# )
 
-deep_snapper <- create_critter(
-  scientific_name = "Pristipomoides filamentosus",
-  habitat = lapply(1:seasons, function(x)
-    deep_reef_habitat),
-  recruit_habitat = deep_reef_habitat,
-  adult_diffusion = deep_snapper_diffusion,
-  # standard deviation of the number of patches moved by adults
-  recruit_diffusion = simulation_area,
-  density_dependence = "post_dispersal",
-  # recruitment form, where 1 implies local recruitment
-  seasons = seasons,
-  resolution = resolution,
-  init_explt = 0.075,
-  fished_depletion = 0.6,
-  ssb0 = 5000,
-  steepness = 0.6,
-  max_hab_mult = max_hab_mult,
-  patch_area = patch_area
-)
+# conch
 
+# conch <- create_critter(
+#   scientific_name = "lobatus gigas",
+#   habitat = juvenile_habitat,
+#   recruit_habitat = juvenile_habitat,
+#   adult_diffusion = conch_diffusion,
+#   recruit_diffusion = simulation_area ,
+#   density_dependence = "pre_dispersal",
+#   # recruitment form, where 1 implies local recruitment
+#   seasons = seasons,
+#   resolution = resolution,
+#   init_explt = 0.125,
+#   fished_depletion = 0.3,
+#   ssb0 = 4000,
+#   max_hab_mult = max_hab_mult,
+#   patch_area = patch_area
+# )
 
-# grouper
-
-
-grouper <- create_critter(
-  scientific_name = "Epinephelus fuscoguttatus",
-  habitat = list(reef_habitat, reef_habitat, reef_habitat, spawning_ground),
-  recruit_habitat = spawning_ground,
-  fec_expo = 1.5,
-  adult_diffusion = c(
-    grouper_diffusion,
-    grouper_diffusion / 100,
-    grouper_diffusion / 100,
-    grouper_diffusion
-  ),
-  recruit_diffusion = simulation_area,
-  density_dependence = "pre_dispersal",
-  seasons = seasons,
-  resolution = resolution,
-  init_explt = 0.1,
-  fished_depletion = 0.2,
-  steepness = 0.6,
-  spawning_seasons = c(4),
-  max_hab_mult = 20,
-  patch_area = patch_area,
-  ssb0 = 10000 # this number comes down to about 1/4 since there is only one spawning season
-)
-
-
-# shark
-
-reef_shark <- create_critter(
-  scientific_name = "Carcharhinus amblyrhynchos",
-  habitat = list(reef_habitat, reef_habitat, reef_habitat, spawning_ground),
-  recruit_habitat = reef_habitat,
-  adult_diffusion = shark_diffusion,
-  recruit_diffusion = patch_area,
-  density_dependence = "local_habitat",
-  # recruitment form, where 1 implies local recruitment
-  seasons = seasons,
-  fec_form = "pups",
-  resolution = resolution,
-  init_explt = 0.2,
-  fished_depletion = 0.2,
-  pups = 6,
-  max_hab_mult = max_hab_mult,
-  patch_area = patch_area,
-  lorenzen_m = FALSE,
-  ssb0 = 100
-)
 
 # critters
 
 fauna <-
   list(
-    "snapper" = snapper,
-    "deep_snapper" = deep_snapper,
-    "grouper" = grouper,
-    "reef_shark" = reef_shark
+    "snapper" = snapper
   )
 
 
@@ -231,33 +159,9 @@ fleet_one = create_fleet(
       sel_start = .5,
       sel_delta = 1,
       p_explt = 1
-    ),
-    deep_snapper = Metier$new(
-      critter = fauna$deep_snapper,
-      price = 50,
-      sel_form = "logistic",
-      sel_start = .5,
-      sel_delta = .2,
-      p_explt = 1
-    ),
-    grouper = Metier$new(
-      critter = fauna$grouper,
-      price = 100,
-      sel_form = "logistic",
-      sel_start = 0.25,
-      sel_delta = 1,
-      p_explt = 2
-    ),
-    reef_shark = Metier$new(
-      critter = fauna$reef_shark,
-      price = 2.5,
-      sel_form = "logistic",
-      sel_start = 0.25,
-      sel_delta = .2,
-      p_explt = 2
     )
   ),
-  ports = ports[1, ],
+  #ports = ports[1, ],
   cost_per_unit_effort = 1,
   cost_per_distance = 5,
   responsiveness = 0.5,
@@ -268,121 +172,59 @@ fleet_one = create_fleet(
   spatial_allocation = "ppue"
 )
 
-fleet_two <- create_fleet(
-  list(
-    snapper = Metier$new(
-      critter = fauna$snapper,
-      price = 50,
-      sel_form = "dome",
-      sel_start = 0.5,
-      sel_delta = 1,
-      p_explt = 2
-    ),
-    deep_snapper = Metier$new(
-      critter = fauna$deep_snapper,
-      price = 75,
-      sel_form = "logistic",
-      sel_start = 0.5,
-      sel_delta = .1,
-      p_explt = 2
-    ),
-    grouper = Metier$new(
-      critter = fauna$grouper,
-      price = 50,
-      sel_form = "dome",
-      sel_start = 0.5,
-      sel_delta = 1,
-      p_explt = 1.5
-    ),
-    reef_shark = Metier$new(
-      critter = fauna$reef_shark,
-      price = 0,
-      sel_form = "logistic",
-      sel_start = 0.25,
-      sel_delta = .2,
-      p_explt = 1
-    )
-  ),
-  ports = ports[2, ],
-  cost_per_unit_effort = 1,
-  cost_per_distance = 5,
-  responsiveness = 0.05,
-  cr_ratio = 1,
-  resolution = resolution,
-  mpa_response = "stay",
-  fleet_model = "open access",
-  spatial_allocation = "ppue"
-)
+# fleet_two = create_fleet(
+#   list(
+#     lobster = Metier$new(
+#       critter = fauna$lobster,
+#       price = 50,
+#       sel_form = "logistic",
+#       sel_start = .5,
+#       sel_delta = 1,
+#       p_explt = 1
+#     ),
+#     conch = Metier$new(
+#       critter = fauna$conch,
+#       price = 100,
+#       sel_form = "logistic",
+#       sel_start = 0.25,
+#       sel_delta = 1,
+#       p_explt = 2
+#     )
+#   ),
+#   ports = ports[1, ],
+#   cost_per_unit_effort = 1,
+#   cost_per_distance = 5,
+#   responsiveness = 0.5,
+#   cr_ratio = 1,
+#   resolution = resolution,
+#   mpa_response = "stay",
+#   fleet_model = "constant effort",
+#   spatial_allocation = "ppue"
+# )
 
 
-fleet_three <- create_fleet(
-  list(
-    snapper = Metier$new(
-      critter = fauna$snapper,
-      price = 50,
-      sel_form = "logistic",
-      sel_start = 0.5,
-      sel_delta = 1,
-      p_explt = 2
-    ),
-    deep_snapper = Metier$new(
-      critter = fauna$deep_snapper,
-      price = 75,
-      sel_form = "logistic",
-      sel_start = 0.5,
-      sel_delta = .1,
-      p_explt = 2
-    ),
-    grouper = Metier$new(
-      critter = fauna$grouper,
-      price = 50,
-      sel_form = "logistic",
-      sel_start = 0.5,
-      sel_delta = 1,
-      p_explt = 1.5
-    ),
-    reef_shark = Metier$new(
-      critter = fauna$reef_shark,
-      price = 0,
-      sel_form = "logistic",
-      sel_start = 0.25,
-      sel_delta = .2,
-      p_explt = 1
-    )
-  ),
-  ports = ports[2, ],
-  cost_per_unit_effort = 1,
-  cost_per_distance = 5,
-  responsiveness = 0.05,
-  cr_ratio = 1,
-  resolution = resolution,
-  mpa_response = "stay",
-  fleet_model = "open access",
-  spatial_allocation = "ppue"
-)
+fleets <- list(fleet_one = fleet_one)
 
-fleets <- list(fleet_one = fleet_one,
-               fleet_two = fleet_two)
-
-logistic_fleets <- list(fleet_one = fleet_one,
-                        fleet_two = fleet_three)
+logistic_fleets <- list(fleet_one = fleet_one)
 
 fleets <-
   tune_fleets(fauna, fleets, tune_type = tune_type, tune_costs = TRUE) # tunes the catchability by fleet to achieve target depletion
 
 logistic_fleets <- tune_fleets(fauna, logistic_fleets, tune_type = tune_type, tune_costs = TRUE) # tunes the catchability by fleet to achieve target depletion
 
-logistic_fleets$fleet_two$metiers$snapper$sel_at_age %>% plot()
+logistic_fleets$fleet_one$metiers$snapper$sel_at_age %>% plot()
 
-logistic_fleets$fleet_two$metiers$grouper$sel_at_age %>% plot()
+logistic_fleets$fleet_two$metiers$lobster$sel_at_age %>% plot()
 
-logistic_fleets$fleet_two$metiers$reef_shark$sel_at_age %>% plot()
+logistic_fleets$fleet_two$metiers$conch$sel_at_age %>% plot()
 
-fleets$fleet_two$metiers$snapper$sel_at_age %>% plot()
+#logistic_fleets$fleet_two$metiers$reef_shark$sel_at_age %>% plot()
 
-fleets$fleet_two$metiers$grouper$sel_at_age %>% plot()
+fleets$fleet_one$metiers$snapper$sel_at_age %>% plot()
 
-fleets$fleet_two$metiers$reef_shark$sel_at_age %>% plot()
+fleets$fleet_two$metiers$lobster$sel_at_age %>% plot()
+
+fleets$fleet_two$metiers$conch$sel_at_age %>% plot()
 
 # run simulation ----------------------------------------------------------
 
@@ -530,7 +372,6 @@ resolution <- sqrt((coral_fauna[[1]]$patches))
 
 grid <- expand_grid(x = 1:resolution, y = 1:resolution) %>%
   mutate(patch = 1:nrow(.))
-
 
 mpa_locations <-
   expand_grid(x = 1:resolution, y = 1:resolution) %>%
