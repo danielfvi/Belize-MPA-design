@@ -17,7 +17,7 @@ simulation_area <- patch_area * patches #km2
 
 seasons <- 1
 
-tune_type <- "depletion"
+tune_type <- "explt"
 
 experiment_workers <- parallel::detectCores() - 2
 
@@ -86,8 +86,8 @@ write_rds(
 snapper <- create_critter(
   scientific_name = "lutjanus malabaricus",
   habitat = lapply(1:seasons, function(x)
-    shallow_reef_habitat),
-  recruit_habitat = shallow_reef_habitat,
+    reef_habitat),
+  recruit_habitat = reef_habitat,
   adult_diffusion = snapper_diffusion,
   recruit_diffusion = simulation_area ,
   density_dependence = "pre_dispersal",
@@ -210,13 +210,13 @@ logistic_fleets <- list(fleet_one = fleet_one)
 fleets <-
   tune_fleets(fauna, fleets, tune_type = tune_type, tune_costs = TRUE) # tunes the catchability by fleet to achieve target depletion
 
-logistic_fleets <- tune_fleets(fauna, logistic_fleets, tune_type = tune_type, tune_costs = TRUE) # tunes the catchability by fleet to achieve target depletion
-
-logistic_fleets$fleet_one$metiers$snapper$sel_at_age %>% plot()
-
-logistic_fleets$fleet_two$metiers$lobster$sel_at_age %>% plot()
-
-logistic_fleets$fleet_two$metiers$conch$sel_at_age %>% plot()
+# logistic_fleets <- tune_fleets(fauna, logistic_fleets, tune_type = tune_type, tune_costs = TRUE) # tunes the catchability by fleet to achieve target depletion
+# 
+# logistic_fleets$fleet_one$metiers$snapper$sel_at_age %>% plot()
+# 
+# logistic_fleets$fleet_two$metiers$lobster$sel_at_age %>% plot()
+# 
+# logistic_fleets$fleet_two$metiers$conch$sel_at_age %>% plot()
 
 #logistic_fleets$fleet_two$metiers$reef_shark$sel_at_age %>% plot()
 
@@ -358,6 +358,7 @@ starting_step = clean_steps(last(names(starting_conditions)))
 
 
 # running mpa experiments -------------------------------------------------
+mpa_locations <- read_csv("data/mpa_locations.csv")
 
 write_rds(
   list(fauna = fauna, fleets = fleets, logistic_fleets = logistic_fleets),

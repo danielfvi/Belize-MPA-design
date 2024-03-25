@@ -17,7 +17,7 @@ simulation_area <- patch_area * patches #km2
 
 seasons <- 1
 
-tune_type <- "depletion"
+tune_type <- "explt"
 
 experiment_workers <- parallel::detectCores() - 2
 
@@ -68,7 +68,25 @@ write_rds(
 )
 
 snapper <- create_critter(
-  scientific_name = "lutjanus analis",
+  query_fishlife = FALSE,
+  #common_name = "Mutton snapper",
+  #scientific_name = "lutjanus analis",
+  linf = 87.4,
+  vbk = 0.16,
+  t0 = -1.32,
+  cv_len = 0.1,
+  length_units = 'cm',
+  min_age = 0,
+  max_age = 40,
+  weight_a = 0.114,
+  weight_b = 2.53,
+  pups = 10,
+  weight_units = 'kg',
+  fec_form = "weight",
+  fec_expo = 1,
+  length_50_mature = 40,
+  length_95_mature = NA,
+  delta_mature = .1,
   habitat = reef_habitat,
   recruit_habitat = juvenile_habitat,
   adult_diffusion = snapper_diffusion,
@@ -77,8 +95,8 @@ snapper <- create_critter(
   # recruitment form, where 1 implies local recruitment
   seasons = seasons,
   resolution = resolution,
-  init_explt = 0.125,
-  fished_depletion = 0.3,
+  init_explt = 0.125, #F/Fmsy much faster
+  fished_depletion = 0.3, #ssb/ssb0
   ssb0 = 4000,
   max_hab_mult = max_hab_mult,
   patch_area = patch_area
@@ -87,7 +105,24 @@ snapper <- create_critter(
 # lobster
 
 lobster <- create_critter(
-  scientific_name = "panulirus argus",
+  query_fishlife = FALSE,
+  #common_name = "Spinny lobster",
+  #scientific_name = "panulirus argus",
+  linf = 18.36,
+  vbk = 0.24,
+  t0 = 0.446,
+  cv_len = 0.1,
+  length_units = 'cm',
+  min_age = 0,
+  max_age = NA,
+  weight_a = 0.0036,
+  weight_b = 2.66,
+  weight_units = 'kg',
+  fec_form = "weight",
+  fec_expo = 1,
+  length_50_mature = 8.5,
+  length_95_mature = 9.1,
+  delta_mature = .1,
   habitat = reef_habitat,
   recruit_habitat = juvenile_habitat,
   adult_diffusion = lobster_diffusion,
@@ -96,7 +131,7 @@ lobster <- create_critter(
   # recruitment form, where 1 implies local recruitment
   seasons = seasons,
   resolution = resolution,
-  init_explt = 0.125,
+  #init_explt = 0.125,
   fished_depletion = 0.3,
   ssb0 = 4000,
   max_hab_mult = max_hab_mult,
@@ -106,7 +141,24 @@ lobster <- create_critter(
 # conch
 
 conch <- create_critter(
-  scientific_name = "lobatus gigas",
+  #scientific_name = "lobatus gigas",
+  #common_name = "Queen conch",
+  query_fishlife = FALSE,
+  linf = 24.5,
+  vbk = 0.42,
+  t0 = 0.27,
+  cv_len = 0.1,
+  length_units = 'cm',
+  min_age = 0,
+  max_age = NA,
+  weight_a = -1.51,
+  weight_b = 2.804,
+  weight_units = 'kg',
+  fec_form = "weight",
+  fec_expo = 1,
+  length_50_mature = 17.8,
+  length_95_mature = NA,
+  delta_mature = .1,
   habitat = juvenile_habitat,
   recruit_habitat = juvenile_habitat,
   adult_diffusion = conch_diffusion,
@@ -158,6 +210,10 @@ fleet_one = create_fleet(
   spatial_allocation = "ppue"
 )
 
+##Lenght_50_sel = 9.5
+#del_delta = 1
+
+
 fleet_two = create_fleet(
   list(
     lobster = Metier$new(
@@ -196,15 +252,17 @@ logistic_fleets <- list(fleet_one = fleet_one,
                         fleet_two = fleet_two)
 
 fleets <-
-  tune_fleets(fauna, fleets, tune_type = tune_type, tune_costs = TRUE) # tunes the catchability by fleet to achieve target depletion
+  tune_fleets(fauna, fleets, tune_type = tune_type, tune_costs = FALSE) # tunes the catchability by fleet to achieve target depletion
 
-logistic_fleets <- tune_fleets(fauna, logistic_fleets, tune_type = tune_type, tune_costs = TRUE) # tunes the catchability by fleet to achieve target depletion
+#tune_type = explt much faster
 
-logistic_fleets$fleet_one$metiers$snapper$sel_at_age %>% plot()
-
-logistic_fleets$fleet_two$metiers$lobster$sel_at_age %>% plot()
-
-logistic_fleets$fleet_two$metiers$conch$sel_at_age %>% plot()
+# logistic_fleets <- tune_fleets(fauna, logistic_fleets, tune_type = tune_type, tune_costs = TRUE) # tunes the catchability by fleet to achieve target depletion
+# 
+# logistic_fleets$fleet_one$metiers$snapper$sel_at_age %>% plot()
+# 
+# logistic_fleets$fleet_two$metiers$lobster$sel_at_age %>% plot()
+# 
+# logistic_fleets$fleet_two$metiers$conch$sel_at_age %>% plot()
 
 #logistic_fleets$fleet_two$metiers$reef_shark$sel_at_age %>% plot()
 
@@ -346,24 +404,21 @@ starting_step = clean_steps(last(names(starting_conditions)))
 
 
 # running mpa experiments -------------------------------------------------
+mpa_loc <- read_csv("data/mpa_locations.csv")
 
 write_rds(
-  list(fauna = fauna, fleets = fleets, logistic_fleets = logistic_fleets),
+  list(fauna = fauna, fleets = fleets),
   file = file.path(results_path, "coral_fauna_and_fleets.rds")
 )
 
-coral_fauna <- fauna
-
-coral_fleets <- fleets
-
-resolution <- sqrt((coral_fauna[[1]]$patches))
-
-grid <- expand_grid(x = 1:resolution, y = 1:resolution) %>%
+grid <- mpa_loc %>% 
+  select(x, y) %>% 
   mutate(patch = 1:nrow(.))
 
-mpa_locations <-
-  expand_grid(x = 1:resolution, y = 1:resolution) %>%
-  mutate(mpa = TRUE)
+mpa_locations = mpa_loc %>% 
+  select(x, y, MPA_1) %>% 
+  rename(mpa = MPA_1) %>% 
+  mutate(mpa = if_else(is.na(mpa), FALSE, mpa))
 
 coral_sim <- simmar(
   fauna = coral_fauna,
