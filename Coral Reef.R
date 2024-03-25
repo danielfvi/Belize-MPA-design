@@ -75,6 +75,7 @@ snapper <- create_critter(
   vbk = 0.16,
   t0 = -1.32,
   cv_len = 0.1,
+  m=0.11,
   length_units = 'cm',
   min_age = 0,
   max_age = 40,
@@ -84,8 +85,9 @@ snapper <- create_critter(
   weight_units = 'kg',
   fec_form = "weight",
   fec_expo = 1,
-  length_50_mature = 40,
-  length_95_mature = NA,
+  #length_50_mature = 40,
+  #length_95_mature = 50,
+  length_mature = 40,
   delta_mature = .1,
   habitat = reef_habitat,
   recruit_habitat = juvenile_habitat,
@@ -95,8 +97,8 @@ snapper <- create_critter(
   # recruitment form, where 1 implies local recruitment
   seasons = seasons,
   resolution = resolution,
-  init_explt = 0.125, #F/Fmsy much faster
-  fished_depletion = 0.3, #ssb/ssb0
+  init_explt = 1.3, #F/Fmsy much faster
+  fished_depletion = 0.25, #ssb/ssb0
   ssb0 = 4000,
   max_hab_mult = max_hab_mult,
   patch_area = patch_area
@@ -112,6 +114,7 @@ lobster <- create_critter(
   vbk = 0.24,
   t0 = 0.446,
   cv_len = 0.1,
+  m = 0.34,
   length_units = 'cm',
   min_age = 0,
   max_age = NA,
@@ -131,7 +134,7 @@ lobster <- create_critter(
   # recruitment form, where 1 implies local recruitment
   seasons = seasons,
   resolution = resolution,
-  #init_explt = 0.125,
+  init_explt = 2,
   fished_depletion = 0.3,
   ssb0 = 4000,
   max_hab_mult = max_hab_mult,
@@ -148,6 +151,7 @@ conch <- create_critter(
   vbk = 0.42,
   t0 = 0.27,
   cv_len = 0.1,
+  m = 0.52,
   length_units = 'cm',
   min_age = 0,
   max_age = NA,
@@ -167,8 +171,8 @@ conch <- create_critter(
   # recruitment form, where 1 implies local recruitment
   seasons = seasons,
   resolution = resolution,
-  init_explt = 0.125,
-  fished_depletion = 0.3,
+  init_explt = 1.2,
+  fished_depletion = 0.4,
   ssb0 = 4000,
   max_hab_mult = max_hab_mult,
   patch_area = patch_area
