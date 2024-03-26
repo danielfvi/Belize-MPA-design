@@ -33,6 +33,11 @@ seagrass_ras <- read_csv("data/seagrass_ras.csv") %>%
   filter(y<18.225,
          y>15.985)
 
+seagrass_reef_ras <- read_csv("data/seagrass_reef_ras.csv") %>% 
+  rename(layer = ...3) %>% 
+  filter(y<18.225,
+         y>15.985)
+
 reef_habitat <- reef_ras %>%
   pivot_wider(names_from = y, values_from = layer) %>%
   select(-x) %>%
@@ -40,6 +45,14 @@ reef_habitat <- reef_ras %>%
 
 reef_habitat[is.na(reef_habitat)] <- 0
 reef_habitat = reef_habitat[1:15,]
+
+lobster_habitat <- seagrass_reef_ras %>%
+  pivot_wider(names_from = y, values_from = layer) %>%
+  select(-x) %>%
+  as.matrix()
+
+lobster_habitat[is.na(lobster_habitat)] <- 0
+lobster_habitat = lobster_habitat[1:15,]
 
 juvenile_habitat <- seagrass_ras %>%
   pivot_wider(names_from = y, values_from = layer) %>%
@@ -49,9 +62,9 @@ juvenile_habitat <- seagrass_ras %>%
 juvenile_habitat[is.na(juvenile_habitat)] <- 0
 juvenile_habitat = juvenile_habitat[1:15,]
 
-ports <-  data.frame(x =  c(15),
-                     y = c(17.455),
-                     fleet = c(1))
+ports <-  data.frame(x =  c(15, 15),
+                     y = c(11, 11),
+                     fleet = c(1, 2))
 
 write_rds(ports, file.path(results_path, "coral_ports.rds"))
 
@@ -60,6 +73,8 @@ patches <- nrow(juvenile_habitat)*ncol(juvenile_habitat)
 patch_area <- 57 # km2
 
 simulation_area <- patch_area * patches #km2
+
+resolution <- c(nrow(juvenile_habitat), ncol(juvenile_habitat))
 
 # setup baseline fauna -----------------------------------------------------
 write_rds(
@@ -128,10 +143,10 @@ lobster <- create_critter(
   length_50_mature = 8.5,
   length_95_mature = 9.1,
   delta_mature = .1,
-  habitat = reef_habitat,
+  habitat = lobster_habitat,
   recruit_habitat = juvenile_habitat,
   adult_diffusion = lobster_diffusion,
-  recruit_diffusion = simulation_area ,
+  recruit_diffusion = simulation_area,
   density_dependence = "pre_dispersal",
   # recruitment form, where 1 implies local recruitment
   seasons = seasons,
@@ -143,51 +158,12 @@ lobster <- create_critter(
   patch_area = patch_area
 )
 
-# conch
-
-conch <- create_critter(
-  #scientific_name = "lobatus gigas",
-  #common_name = "Queen conch",
-  query_fishlife = FALSE,
-  linf = 24.5,
-  vbk = 0.42,
-  t0 = 0.27,
-  cv_len = 0.1,
-  m = 0.52,
-  length_units = 'cm',
-  min_age = 0,
-  max_age = NA,
-  weight_a = -1.51,
-  weight_b = 2.804,
-  weight_units = 'kg',
-  fec_form = "weight",
-  fec_expo = 1,
-  length_50_mature = 17.8,
-  length_95_mature = NA,
-  delta_mature = .1,
-  habitat = juvenile_habitat,
-  recruit_habitat = juvenile_habitat,
-  adult_diffusion = conch_diffusion,
-  recruit_diffusion = simulation_area ,
-  density_dependence = "pre_dispersal",
-  # recruitment form, where 1 implies local recruitment
-  seasons = seasons,
-  resolution = resolution,
-  init_explt = 1.2,
-  fished_depletion = 0.4,
-  ssb0 = 4000,
-  max_hab_mult = max_hab_mult,
-  patch_area = patch_area
-)
-
-
 # critters
 
 fauna <-
   list(
     "snapper" = snapper,
-    "lobster" = lobster,
-    "conch" = conch
+    "lobster" = lobster
   )
 
 
@@ -198,7 +174,7 @@ fleet_one = create_fleet(
   list(
     snapper = Metier$new(
       critter = fauna$snapper,
-      price = 50,
+      price = 20,
       sel_form = "logistic",
       sel_start = .5,
       sel_delta = 1,
@@ -229,17 +205,9 @@ fleet_two = create_fleet(
       sel_start = .5,
       sel_delta = 1,
       p_explt = 1
-    ),
-    conch = Metier$new(
-      critter = fauna$conch,
-      price = 100,
-      sel_form = "logistic",
-      sel_start = 0.25,
-      sel_delta = 1,
-      p_explt = 2
     )
   ),
-  ports = ports[1, ],
+  ports = ports[2, ],
   cost_per_unit_effort = 1,
   cost_per_distance = 5,
   responsiveness = 0.5,
@@ -253,9 +221,6 @@ fleet_two = create_fleet(
 
 fleets <- list(fleet_one = fleet_one,
                fleet_two = fleet_two)
-
-logistic_fleets <- list(fleet_one = fleet_one,
-                        fleet_two = fleet_two)
 
 fleets <-
   tune_fleets(fauna, fleets, tune_type = tune_type, tune_costs = FALSE) # tunes the catchability by fleet to achieve target depletion
