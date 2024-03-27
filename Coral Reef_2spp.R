@@ -15,11 +15,11 @@ years <- 50
 
 # set diffusion rates -----------------------------------------------------
 
-snapper_diffusion <- 4 # km^2/year
+snapper_diffusion <- 1 # km^2/year
 
-lobster_diffusion <-  2 # km^2/year
+lobster_diffusion <-  0.5 # km^2/year
 
-conch_diffusion <-  0.5 # km^2/year
+#conch_diffusion <-  0.5 # km^2/year
 
 max_hab_mult = 20
 
@@ -27,40 +27,48 @@ max_hab_mult = 20
 reef_ras <- read_csv("data/reef_ras.csv") %>% 
   rename(layer = ...3) %>% 
   filter(y<18.225,
-         y>15.985)
+         y>15.985) %>% 
+  mutate(layer = replace_na(layer, 0),
+         layer = layer/max(layer))
+
 seagrass_ras <- read_csv("data/seagrass_ras.csv") %>% 
   rename(layer = ...3) %>% 
   filter(y<18.225,
-         y>15.985)
+         y>15.985) %>% 
+  mutate(layer = replace_na(layer, 0),
+         layer = layer/max(layer))
 
 seagrass_reef_ras <- read_csv("data/seagrass_reef_ras.csv") %>% 
   rename(layer = ...3) %>% 
   filter(y<18.225,
-         y>15.985)
+         y>15.985,
+         ) %>% 
+  mutate(layer = replace_na(layer, 0),
+         layer = layer/max(layer))
 
 reef_habitat <- reef_ras %>%
   pivot_wider(names_from = y, values_from = layer) %>%
-  select(-x) %>%
+  dplyr::select(-x) %>%
   as.matrix() 
 
-reef_habitat[is.na(reef_habitat)] <- 0
-reef_habitat = reef_habitat[1:15,]
+#reef_habitat[is.na(reef_habitat)] <- 0
+#reef_habitat = reef_habitat[1:15,]
 
 lobster_habitat <- seagrass_reef_ras %>%
   pivot_wider(names_from = y, values_from = layer) %>%
-  select(-x) %>%
+  dplyr::select(-x) %>%
   as.matrix()
 
-lobster_habitat[is.na(lobster_habitat)] <- 0
-lobster_habitat = lobster_habitat[1:15,]
+#lobster_habitat[is.na(lobster_habitat)] <- 0
+#lobster_habitat = lobster_habitat[1:15,]
 
 juvenile_habitat <- seagrass_ras %>%
   pivot_wider(names_from = y, values_from = layer) %>%
-  select(-x) %>%
+  dplyr::select(-x) %>%
   as.matrix()
 
-juvenile_habitat[is.na(juvenile_habitat)] <- 0
-juvenile_habitat = juvenile_habitat[1:15,]
+#juvenile_habitat[is.na(juvenile_habitat)] <- 0
+#juvenile_habitat = juvenile_habitat[1:15,]
 
 ports <-  data.frame(x =  c(15, 15),
                      y = c(11, 11),
@@ -114,8 +122,8 @@ snapper <- create_critter(
   # recruitment form, where 1 implies local recruitment
   seasons = seasons,
   resolution = resolution,
-  init_explt = 1.3, #F/Fmsy much faster
-  fished_depletion = 0.25, #ssb/ssb0
+  init_explt = 0.125, #F/Fmsy much faster
+  #fished_depletion = 0.25, #ssb/ssb0
   ssb0 = 4000,
   max_hab_mult = max_hab_mult,
   patch_area = patch_area
@@ -151,8 +159,8 @@ lobster <- create_critter(
   # recruitment form, where 1 implies local recruitment
   seasons = seasons,
   resolution = resolution,
-  init_explt = 2,
-  fished_depletion = 0.3,
+  init_explt = 0.16,
+  #fished_depletion = 0.3,
   ssb0 = 4000,
   max_hab_mult = max_hab_mult,
   patch_area = patch_area
@@ -179,6 +187,14 @@ fleet_one = create_fleet(
       sel_start = .5,
       sel_delta = 1,
       p_explt = 1
+    ),
+    lobster = Metier$new(
+      critter = fauna$lobster,
+      price = 0,
+      sel_form = "logistic",
+      sel_start = 8,
+      sel_delta = 1,
+      p_explt = 0
     )
   ),
   ports = ports[1, ],
@@ -205,6 +221,14 @@ fleet_two = create_fleet(
       sel_start = .5,
       sel_delta = 1,
       p_explt = 1
+    ),
+    snapper = Metier$new(
+      critter = fauna$snapper,
+      price = 0,
+      sel_form = "logistic",
+      sel_start = 40,
+      sel_delta = 1,
+      p_explt = 0
     )
   ),
   ports = ports[2, ],
@@ -222,26 +246,21 @@ fleet_two = create_fleet(
 fleets <- list(fleet_one = fleet_one,
                fleet_two = fleet_two)
 
+# tune_type <- "depletion"
+#tune_type <- "explt"
+
 fleets <-
   tune_fleets(fauna, fleets, tune_type = tune_type, tune_costs = FALSE) # tunes the catchability by fleet to achieve target depletion
 
+#Lower number of licenses
+#fleets$fleet_one$base_effort = 300
+
 #tune_type = explt much faster
 
-# logistic_fleets <- tune_fleets(fauna, logistic_fleets, tune_type = tune_type, tune_costs = TRUE) # tunes the catchability by fleet to achieve target depletion
-# 
-# logistic_fleets$fleet_one$metiers$snapper$sel_at_age %>% plot()
-# 
-# logistic_fleets$fleet_two$metiers$lobster$sel_at_age %>% plot()
-# 
-# logistic_fleets$fleet_two$metiers$conch$sel_at_age %>% plot()
+#fleets$fleet_two$metiers$snapper$sel_at_age %>% plot()
 
-#logistic_fleets$fleet_two$metiers$reef_shark$sel_at_age %>% plot()
+#fleets$fleet_two$metiers$lobster$sel_at_age %>% plot()
 
-fleets$fleet_one$metiers$snapper$sel_at_age %>% plot()
-
-fleets$fleet_two$metiers$lobster$sel_at_age %>% plot()
-
-fleets$fleet_two$metiers$conch$sel_at_age %>% plot()
 
 # run simulation ----------------------------------------------------------
 
@@ -249,17 +268,92 @@ reef_sim <- simmar(fauna = fauna,
                    fleets = fleets,
                    years = years)
 
-
-logistic_reef_sim <- simmar(fauna = fauna,
-                            fleets = logistic_fleets,
-                            years = years)
-
 prs <- process_marlin(reef_sim, keep_age = FALSE)
 
+plot_marlin(prs = prs, plot_var = "ssb")
 
-plrs <- process_marlin(logistic_reef_sim, keep_age = FALSE)
+patch_noMPA <-
+  map_df(reef_sim, ~ map_df(.x, ~ tibble(
+    catch = rowSums(.x$c_p_fl),
+    biomass = rowSums(.x$b_p_a),
+    revenue = rowSums(.x$r_p_fl),
+    patch = 1:nrow(.x$ssb_p_a)
+  ), .id = "critter"), .id = "step") %>% 
+  separate(step, "_", into = c("step","year", "season")) %>% 
+  mutate(year = as.double(year)) %>% 
+  group_by(year) %>% 
+  summarise(catch_noMPA = sum(catch),
+            biomass_noMPA = sum(biomass),
+            revenue_noMPA = sum(revenue))
 
-plot_marlin(prs = prs, plrs = plrs, plot_var = "ssb")
+# running mpa experiments -------------------------------------------------
+mpa_loc <- read_csv("data/mpa_locations.csv") %>% 
+  filter(y<18.225,
+         y>15.985)
+
+write_rds(
+  list(fauna = fauna, fleets = fleets),
+  file = file.path(results_path, "coral_fauna_and_fleets.rds")
+)
+
+grid <- mpa_loc %>% 
+  dplyr::select(x, y) %>% 
+  mutate(patch = 1:nrow(.))
+
+mpa_locations = mpa_loc %>% 
+  dplyr::select(x, y, MPA_1) %>% 
+  rename(mpa = MPA_1) %>% 
+  mutate(mpa = if_else(is.na(mpa), FALSE, mpa))
+
+ggplot() +
+  geom_raster(data = mpa_locations , aes(x = x, y = y, fill = mpa)) 
+
+coral_sim <- simmar(
+  fauna = fauna,
+  fleets = fleets,
+  manager = list(mpas = list(
+    locations = mpa_locations,
+    mpa_year = 2
+  )),
+  years = 50
+)
+
+prs <- process_marlin(coral_sim, keep_age = FALSE)
+
+plot_marlin(prs = prs, plot_var = "ssb")
+
+patch_MPA <-
+  map_df(coral_sim, ~ map_df(.x, ~ tibble(
+    catch = rowSums(.x$c_p_fl),
+    biomass = rowSums(.x$b_p_a),
+    revenue = rowSums(.x$r_p_fl),
+    patch = 1:nrow(.x$ssb_p_a)
+  ), .id = "critter"), .id = "step") %>% 
+  separate(step, "_", into = c("step","year", "season")) %>% 
+  mutate(year = as.double(year)) %>% 
+  group_by(year) %>% 
+  summarise(catch_MPA = sum(catch),
+            biomass_MPA = sum(biomass),
+            revenue_MPA = sum(revenue))
+
+###Compare outcomes
+patch_dta = patch_noMPA %>% 
+  left_join(patch_MPA) %>% 
+  filter(year == 50) %>% 
+  reshape2::melt(id.vars = c("year")) %>% 
+  separate(variable, "_", into = c("variable","is_MPA")) %>% 
+  as.data.frame()
+
+ggplot(data = patch_dta, aes(x=variable, y=value, fill = is_MPA)) +
+  geom_col(position = "dodge")
+
+
+
+
+
+
+
+
 
 prs$fauna |>
   filter(year == max(year)) |>
@@ -291,9 +385,7 @@ patch_biomass <-
   map_df(reef_sim, ~ map_df(.x, ~ tibble(
     biomass = rowSums(.x$b_p_a),
     patch = 1:nrow(.x$b_p_a)
-  ), .id = "critter"), .id = "step") %>%
-  mutate(step = marlin::clean_steps(step)) |>
-  left_join(grid, by = "patch")
+  ), .id = "critter"), .id = "step")
 
 biomass <-
   map_df(reef_sim, ~ map_df(.x, ~ tibble(biomass = sum(.x$b_p_a)), .id = "critter"), .id = "step") %>%
@@ -375,7 +467,9 @@ starting_step = clean_steps(last(names(starting_conditions)))
 
 
 # running mpa experiments -------------------------------------------------
-mpa_loc <- read_csv("data/mpa_locations.csv")
+mpa_loc <- read_csv("data/mpa_locations.csv") %>% 
+  filter(y<18.225,
+         y>15.985)
 
 write_rds(
   list(fauna = fauna, fleets = fleets),
@@ -383,23 +477,41 @@ write_rds(
 )
 
 grid <- mpa_loc %>% 
-  select(x, y) %>% 
+  dplyr::select(x, y) %>% 
   mutate(patch = 1:nrow(.))
 
 mpa_locations = mpa_loc %>% 
-  select(x, y, MPA_1) %>% 
+  dplyr::select(x, y, MPA_1) %>% 
   rename(mpa = MPA_1) %>% 
   mutate(mpa = if_else(is.na(mpa), FALSE, mpa))
 
 coral_sim <- simmar(
-  fauna = coral_fauna,
-  fleets = coral_fleets,
+  fauna = fauna,
+  fleets = fleets,
   manager = list(mpas = list(
     locations = mpa_locations,
     mpa_year = 1
   )),
   years = 50
 )
+
+prs <- process_marlin(coral_sim, keep_age = FALSE)
+
+plot_marlin(prs = prs, plot_var = "ssb")
+
+patch_MPA <-
+  map_df(coral_sim, ~ map_df(.x, ~ tibble(
+    catch = rowSums(.x$c_p_fl),
+    biomass = rowSums(.x$b_p_a),
+    revenue = rowSums(.x$r_p_fl),
+    patch = 1:nrow(.x$ssb_p_a)
+  ), .id = "critter"), .id = "step") %>% 
+  separate(step, "_", into = c("step","year", "season")) %>% 
+  mutate(year = as.double(year)) %>% 
+  group_by(year) %>% 
+  summarise(catch_noMPA = sum(catch),
+            biomass_noMPA = sum(biomass),
+            revenue_noMPA = sum(revenue))
 
 
 patch_biomass <-
