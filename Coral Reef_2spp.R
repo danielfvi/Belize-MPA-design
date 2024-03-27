@@ -48,9 +48,16 @@ seagrass_reef_ras <- read_csv("data/seagrass_reef_ras.csv") %>%
 
 reef_habitat <- reef_ras %>%
   pivot_wider(names_from = y, values_from = layer) %>%
-  dplyr::select(-x) %>%
+  #dplyr::select(-x) %>%
   as.matrix() 
 
+x_id = reef_habitat %>% 
+  as.data.frame() %>% 
+  mutate(id.x = 1:nrow(reef_habitat)) %>% 
+  dplyr::select(x, id.x)
+
+y_id = data.frame(y = unique(reef_ras$y),
+                  id.y = 1:31)
 #reef_habitat[is.na(reef_habitat)] <- 0
 #reef_habitat = reef_habitat[1:15,]
 
@@ -300,10 +307,21 @@ grid <- mpa_loc %>%
   dplyr::select(x, y) %>% 
   mutate(patch = 1:nrow(.))
 
+# mpa_locations = mpa_loc %>% 
+#   dplyr::select(x, y, MPA_1) %>% 
+#   rename(mpa = MPA_1) %>% 
+#   mutate(mpa = if_else(is.na(mpa), FALSE, mpa))
+
 mpa_locations = mpa_loc %>% 
   dplyr::select(x, y, MPA_1) %>% 
   rename(mpa = MPA_1) %>% 
-  mutate(mpa = if_else(is.na(mpa), FALSE, mpa))
+  mutate(mpa = if_else(is.na(mpa), FALSE, mpa)) %>% 
+  left_join(x_id) %>% 
+  left_join(y_id) %>% 
+  dplyr::select(-y, -x) %>% 
+  rename(y=id.y,
+         x=id.x) %>% 
+  dplyr::select(x, y, mpa)
 
 ggplot() +
   geom_raster(data = mpa_locations , aes(x = x, y = y, fill = mpa)) 
@@ -484,6 +502,15 @@ mpa_locations = mpa_loc %>%
   dplyr::select(x, y, MPA_1) %>% 
   rename(mpa = MPA_1) %>% 
   mutate(mpa = if_else(is.na(mpa), FALSE, mpa))
+
+mpa_locations = mpa_loc %>% 
+  dplyr::select(x, y, MPA_1) %>% 
+  rename(mpa = MPA_1) %>% 
+  mutate(mpa = if_else(is.na(mpa), FALSE, mpa)) %>% 
+  left_join(x_id) %>% 
+  dplyr::select(-x) %>% 
+  rename(x=id) %>% 
+  dplyr::select(x, y, mpa)
 
 coral_sim <- simmar(
   fauna = fauna,
